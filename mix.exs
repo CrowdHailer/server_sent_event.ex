@@ -3,7 +3,7 @@ defmodule ServerSentEvent.Mixfile do
 
   def project do
     [app: :server_sent_event,
-     version: "0.2.0",
+     version: "0.2.1",
      elixir: "~> 1.4",
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
@@ -25,7 +25,7 @@ defmodule ServerSentEvent.Mixfile do
 
   defp description do
     """
-    Push updates to Web clients over HTTP or using dedicated server-push protocols.
+    Push updates to Web clients over HTTP or using dedicated server-push protocol.
     """
   end
 
@@ -34,6 +34,6 @@ defmodule ServerSentEvent.Mixfile do
      files: ["lib", "mix.exs", "README*"],
      maintainers: ["Peter Saxton"],
      licenses: ["Apache 2.0"],
-     links: %{"GitHub" => "https://github.com/CrowdHailer/raxx/tree/master/server_sent_event"}]
+     links: %{"GitHub" => "https://github.com/CrowdHailer/server_sent_event.ex"}]
   end
 end
