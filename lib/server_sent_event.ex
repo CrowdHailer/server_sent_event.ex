@@ -6,7 +6,7 @@ defmodule ServerSentEvent do
 
   Messages are sent in the following form, with the `text/event-stream` MIME type:
 
-  ```sh
+  ```txt
   data: This is the first message.
 
   data: This is the second message, it
@@ -134,6 +134,52 @@ defmodule ServerSentEvent do
   defp single_line?(text) do
     length(String.split(text, @new_line, parts: 2)) == 1
   end
+  @doc """
+  Parse all events from text stream.
+
+  ## Examples
+  *In these examples this module has been aliased to `SSE`*.
+
+      iex> SSE.parse_all("data: First message\\n\\ndata: Second\\ndata: message\\n\\nrest")
+      {:ok,
+        {
+          [
+            %SSE{lines: ["First message"]},
+            %SSE{lines: ["Second", "message"]}
+          ],
+          "rest"
+        }
+      }
+
+      iex> SSE.parse_all("data: This is the first message\\n\\n")
+      {:ok, {[%SSE{lines: ["This is the first message"]}], ""}}
+
+      iex> SSE.parse_all("data: This is the first message\\n\\nrest")
+      {:ok, {[%SSE{lines: ["This is the first message"]}], "rest"}}
+
+      iex> SSE.parse_all("data: This message is not complete")
+      {:ok, {[], "data: This message is not complete"}}
+
+      iex> SSE.parse_all("This line is invalid\\nit doesn't contain a colon\\n")
+      {:error, {:malformed_line, "This line is invalid"}}
+  """
+  @spec parse_all(String.t) :: {:ok, {[event :: t()], rest :: String.t}}
+  | {:error, term}
+  def parse_all(stream) do
+    with {:ok, {evts, rest}} <- do_parse_all(stream, []),
+    do: {:ok, {Enum.reverse(evts), rest}}
+  end
+
+  defp do_parse_all(stream, events) do
+    case parse(stream) do
+      {:ok, {nil, rest}} ->
+        {:ok, {events, rest}}
+      {:ok, {evt, rest}} ->
+        do_parse_all(rest, [evt | events])
+      err ->
+        err
+    end
+  end
 
   @doc """
   Parse the next event from text stream, if present.
@@ -176,7 +222,8 @@ defmodule ServerSentEvent do
 
   """
   # parse_block block has comments event does not
-  @spec parse(String.t) :: {:ok, {event :: t() | nil, rest :: String.t}} | {:error, term}
+  @spec parse(String.t) :: {:ok, {event :: t() | nil, rest :: String.t}}
+  | {:error, term}
   def parse(stream) do
     do_parse(stream, %__MODULE__{}, stream)
   end
