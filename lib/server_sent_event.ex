@@ -31,11 +31,11 @@ defmodule ServerSentEvent do
   @new_line ~r/\R/
 
   @type t :: %This{
-    type: term(),
-    lines: [term()],
-    id: term(),
-    retry: nil,
-    comments: [term()]
+    type: nil | String.t,
+    lines: [String.t],
+    id: nil | String.t,
+    retry: nil | integer(),
+    comments: [String.t]
   }
 
   defstruct [
@@ -84,7 +84,7 @@ defmodule ServerSentEvent do
       "data: message setting retry to 10s\\nretry: 10000\\n\\n"
   """
   @spec serialize(event :: t()) :: String.t
-  def serialize(event = %__MODULE__{}) do
+  def serialize(event = %This{}) do
     type_line(event)
     ++ comment_lines(event)
     ++ data_lines(event)
@@ -225,7 +225,7 @@ defmodule ServerSentEvent do
   @spec parse(String.t) :: {:ok, {event :: t() | nil, rest :: String.t}}
   | {:error, term}
   def parse(stream) do
-    do_parse(stream, %__MODULE__{}, stream)
+    do_parse(stream, %This{}, stream)
   end
 
   defp do_parse(stream, event, original) do
