@@ -1,4 +1,6 @@
 defmodule ServerSentEvent do
+  alias __MODULE__, as: This
+
   @moduledoc """
   **Push updates to Web clients over HTTP or using dedicated server-push protocols.**
 
@@ -28,6 +30,14 @@ defmodule ServerSentEvent do
 
   @new_line ~r/\R/
 
+  @type t :: %This{
+    type: term(),
+    lines: [term()],
+    id: term(),
+    retry: nil,
+    comments: [term()]
+  }
+
   defstruct [
     type: nil,
     lines: [],
@@ -39,7 +49,8 @@ defmodule ServerSentEvent do
   @doc """
   This event stream format's MIME type is `text/event-stream`.
   """
-  def mime_type do
+  @spec mime_type() :: String.t
+  def mime_type() do
     "text/event-stream"
   end
 
@@ -48,8 +59,9 @@ defmodule ServerSentEvent do
 
   An event without any data lines will not trigger any browser events.
   """
-  def empty?(%{lines: []}), do: true
-  def empty?(%{lines: _}), do: false
+  @spec empty?(event :: t()) :: boolean
+  def empty?(_event = %{lines: []}), do: true
+  def empty?(_event = %{lines: _}), do: false
 
   @doc """
   Format an event to be sent as part of a stream
@@ -71,6 +83,7 @@ defmodule ServerSentEvent do
       ...> |> SSE.serialize()
       "data: message setting retry to 10s\\nretry: 10000\\n\\n"
   """
+  @spec serialize(event :: t()) :: String.t
   def serialize(event = %__MODULE__{}) do
     type_line(event)
     ++ comment_lines(event)
@@ -160,6 +173,7 @@ defmodule ServerSentEvent do
 
   """
   # parse_block block has comments event does not
+  @spec parse(String.t) :: nil | {event :: t(), rest :: String.t}
   def parse(stream) do
     do_parse(stream, %__MODULE__{})
   end
