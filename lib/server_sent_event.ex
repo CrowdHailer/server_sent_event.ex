@@ -142,51 +142,54 @@ defmodule ServerSentEvent do
   *In these examples this module has been aliased to `SSE`*.
 
       iex> SSE.parse("data: This is the first message\\n\\n")
-      {%SSE{lines: ["This is the first message"]}, ""}
+      {:ok, {%SSE{lines: ["This is the first message"]}, ""}}
 
       iex> SSE.parse("data:First whitespace character is optional\\n\\n")
-      {%SSE{lines: ["First whitespace character is optional"]}, ""}
+      {:ok, {%SSE{lines: ["First whitespace character is optional"]}, ""}}
 
       iex> SSE.parse("data: This message\\ndata: has two lines.\\n\\n")
-      {%SSE{lines: ["This message", "has two lines."]}, ""}
+      {:ok, {%SSE{lines: ["This message", "has two lines."]}, ""}}
 
       iex> SSE.parse("data: This is the first message\\n\\nrest")
-      {%SSE{lines: ["This is the first message"]}, "rest"}
+      {:ok, {%SSE{lines: ["This is the first message"]}, "rest"}}
 
       iex> SSE.parse("data: This message is not complete")
-      nil
+      {:ok, {nil, "data: This message is not complete"}}
+
+      iex> SSE.parse("This line is invalid\\nit doesn't contain a colon\\n")
+      {:error, {:malformed_line, "This line is invalid"}}
 
       iex> SSE.parse("event: custom\\ndata: This message is type custom\\n\\n")
-      {%SSE{type: "custom", lines: ["This message is type custom"]}, ""}
+      {:ok, {%SSE{type: "custom", lines: ["This message is type custom"]}, ""}}
 
       iex> SSE.parse("id: 100\\ndata: This message has an id\\n\\n")
-      {%SSE{id: "100", lines: ["This message has an id"]}, ""}
+      {:ok, {%SSE{id: "100", lines: ["This message has an id"]}, ""}}
 
       iex> SSE.parse("retry: 5000\\ndata: This message retries after 5s.\\n\\n")
-      {%SSE{retry: 5000, lines: ["This message retries after 5s."]}, ""}
+      {:ok, {%SSE{retry: 5000, lines: ["This message retries after 5s."]}, ""}}
 
       iex> SSE.parse(": This is a comment\\n\\n")
-      {%SSE{comments: ["This is a comment"]}, ""}
+      {:ok, {%SSE{comments: ["This is a comment"]}, ""}}
 
       iex> SSE.parse("data: data can have more :'s in it'\\n\\n")
-      {%SSE{lines: ["data can have more :'s in it'"]}, ""}
+      {:ok, {%SSE{lines: ["data can have more :'s in it'"]}, ""}}
 
   """
   # parse_block block has comments event does not
-  @spec parse(String.t) :: nil | {event :: t(), rest :: String.t}
+  @spec parse(String.t) :: {:ok, {event :: t() | nil, rest :: String.t}} | {:error, term}
   def parse(stream) do
-    do_parse(stream, %__MODULE__{})
+    do_parse(stream, %__MODULE__{}, stream)
   end
 
-  defp do_parse(stream, event) do
+  defp do_parse(stream, event, original) do
     case pop_line(stream) do
       nil ->
-        nil
+        {:ok, {nil, original}}
       {"", rest} ->
-        {event, rest}
+        {:ok, {event, rest}}
       {line, rest} ->
-        event = process_line(line, event)
-        do_parse(rest, event)
+        with {:ok, event} <- process_line(line, event),
+        do: do_parse(rest, event, original)
     end
   end
 
@@ -202,9 +205,11 @@ defmodule ServerSentEvent do
   defp process_line(line, event) do
     case String.split(line, ~r/: ?/, parts: 2) do
       ["", value] ->
-        process_field("comment", value, event)
+        {:ok, process_field("comment", value, event)}
       [field, value] ->
-        process_field(field, value, event)
+        {:ok, process_field(field, value, event)}
+      _ ->
+        {:error, {:malformed_line, line}}
     end
   end
 
