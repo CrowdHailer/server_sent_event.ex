@@ -1,6 +1,4 @@
 defmodule ServerSentEvent do
-  alias __MODULE__, as: This
-
   @moduledoc """
   **Push updates to Web clients over HTTP or using dedicated server-push protocols.**
 
@@ -30,7 +28,7 @@ defmodule ServerSentEvent do
 
   @new_line ~r/\R/
 
-  @type t :: %This{
+  @type t :: %__MODULE__{
     type: nil | String.t,
     lines: [String.t],
     id: nil | String.t,
@@ -84,7 +82,7 @@ defmodule ServerSentEvent do
       "data: message setting retry to 10s\\nretry: 10000\\n\\n"
   """
   @spec serialize(event :: t()) :: String.t
-  def serialize(event = %This{}) do
+  def serialize(event = %__MODULE__{}) do
     type_line(event)
     ++ comment_lines(event)
     ++ data_lines(event)
@@ -162,12 +160,23 @@ defmodule ServerSentEvent do
 
       iex> SSE.parse_all("This line is invalid\\nit doesn't contain a colon\\n")
       {:error, {:malformed_line, "This line is invalid"}}
+
+      iex> SSE.parse_all("data: This is the first message\\n\\nThis line is invalid\\n")
+      {:error, {:malformed_line, "This line is invalid"}}
+
+      iex> SSE.parse_all("data: This is the first message\\n\\nThis line is yet to terminate")
+      {:ok, {[%SSE{lines: ["This is the first message"]}], "This line is yet to terminate"}}
+
   """
   @spec parse_all(String.t) :: {:ok, {[event :: t()], rest :: String.t}}
   | {:error, term}
   def parse_all(stream) do
-    with {:ok, {evts, rest}} <- do_parse_all(stream, []),
-    do: {:ok, {Enum.reverse(evts), rest}}
+    case do_parse_all(stream, []) do
+      {:ok, {evts, rest}} ->
+        {:ok, {Enum.reverse(evts), rest}}
+      err ->
+        err
+    end
   end
 
   defp do_parse_all(stream, events) do
@@ -220,12 +229,18 @@ defmodule ServerSentEvent do
       iex> SSE.parse("data: data can have more :'s in it'\\n\\n")
       {:ok, {%SSE{lines: ["data can have more :'s in it'"]}, ""}}
 
+      iex> SSE.parse("DATA: field names are case-sensitive\\n\\n")
+      {:error, {:invalid_field_name, "DATA"}}
+
+      iex> SSE.parse("unknown: what is this field?\\n\\n")
+      {:error, {:invalid_field_name, "unknown"}}
+
   """
   # parse_block block has comments event does not
   @spec parse(String.t) :: {:ok, {event :: t() | nil, rest :: String.t}}
   | {:error, term}
   def parse(stream) do
-    do_parse(stream, %This{}, stream)
+    do_parse(stream, %__MODULE__{}, stream)
   end
 
   defp do_parse(stream, event, original) do
@@ -252,28 +267,31 @@ defmodule ServerSentEvent do
   defp process_line(line, event) do
     case String.split(line, ~r/: ?/, parts: 2) do
       ["", value] ->
-        {:ok, process_field("comment", value, event)}
+        process_field("comment", value, event)
       [field, value] ->
-        {:ok, process_field(field, value, event)}
+        process_field(field, value, event)
       _ ->
         {:error, {:malformed_line, line}}
     end
   end
 
   defp process_field("event", type, event) do
-    Map.put(event, :type, type)
+    {:ok, Map.put(event, :type, type)}
   end
   defp process_field("data", line, event = %{lines: lines}) do
-    %{event | lines: lines ++ [line]}
+    {:ok, %{event | lines: lines ++ [line]}}
   end
   defp process_field("id", id, event) do
-    Map.put(event, :id, id)
+    {:ok, Map.put(event, :id, id)}
   end
   defp process_field("retry", timeout, event) do
     {timeout, ""} = Integer.parse(timeout)
-    Map.put(event, :retry, timeout)
+    {:ok, Map.put(event, :retry, timeout)}
   end
   defp process_field("comment", comment, event = %{comments: comments}) do
-    %{event | comments: comments ++ [comment]}
+    {:ok, %{event | comments: comments ++ [comment]}}
+  end
+  defp process_field(other_field_name, _value, _event) do
+    {:error, {:invalid_field_name, other_field_name}}
   end
 end
