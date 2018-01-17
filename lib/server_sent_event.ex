@@ -223,6 +223,9 @@ defmodule ServerSentEvent do
       iex> SSE.parse("retry: 5000\\ndata: This message retries after 5s.\\n\\n")
       {:ok, {%SSE{retry: 5000, lines: ["This message retries after 5s."]}, ""}}
 
+      iex> SSE.parse("retry: five thousand\\ndata: retry value is not a valid integer\\n\\n")
+      {:error, {:invalid_retry_value, "five thousand"}}
+
       iex> SSE.parse(": This is a comment\\n\\n")
       {:ok, {%SSE{comments: ["This is a comment"]}, ""}}
 
@@ -285,8 +288,12 @@ defmodule ServerSentEvent do
     {:ok, Map.put(event, :id, id)}
   end
   defp process_field("retry", timeout, event) do
-    {timeout, ""} = Integer.parse(timeout)
-    {:ok, Map.put(event, :retry, timeout)}
+    case Integer.parse(timeout) do
+      {timeout, ""} ->
+        {:ok, Map.put(event, :retry, timeout)}
+      _err ->
+        {:error, {:invalid_retry_value, timeout}}
+    end
   end
   defp process_field("comment", comment, event = %{comments: comments}) do
     {:ok, %{event | comments: comments ++ [comment]}}
