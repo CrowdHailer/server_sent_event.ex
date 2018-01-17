@@ -4,7 +4,7 @@ defmodule ServerSentEvent do
 
   Messages are sent in the following form, with the `text/event-stream` MIME type:
 
-  ```sh
+  ```txt
   data: This is the first message.
 
   data: This is the second message, it
@@ -28,6 +28,14 @@ defmodule ServerSentEvent do
 
   @new_line ~r/\R/
 
+  @type t :: %__MODULE__{
+    type: nil | String.t,
+    lines: [String.t],
+    id: nil | String.t,
+    retry: nil | integer(),
+    comments: [String.t]
+  }
+
   defstruct [
     type: nil,
     lines: [],
@@ -39,7 +47,8 @@ defmodule ServerSentEvent do
   @doc """
   This event stream format's MIME type is `text/event-stream`.
   """
-  def mime_type do
+  @spec mime_type() :: String.t
+  def mime_type() do
     "text/event-stream"
   end
 
@@ -48,8 +57,9 @@ defmodule ServerSentEvent do
 
   An event without any data lines will not trigger any browser events.
   """
-  def empty?(%{lines: []}), do: true
-  def empty?(%{lines: _}), do: false
+  @spec empty?(event :: t()) :: boolean
+  def empty?(_event = %{lines: []}), do: true
+  def empty?(_event = %{lines: _}), do: false
 
   @doc """
   Format an event to be sent as part of a stream
@@ -71,6 +81,7 @@ defmodule ServerSentEvent do
       ...> |> SSE.serialize()
       "data: message setting retry to 10s\\nretry: 10000\\n\\n"
   """
+  @spec serialize(event :: t()) :: String.t
   def serialize(event = %__MODULE__{}) do
     type_line(event)
     ++ comment_lines(event)
@@ -121,6 +132,63 @@ defmodule ServerSentEvent do
   defp single_line?(text) do
     length(String.split(text, @new_line, parts: 2)) == 1
   end
+  @doc """
+  Parse all events from text stream.
+
+  ## Examples
+  *In these examples this module has been aliased to `SSE`*.
+
+      iex> SSE.parse_all("data: First message\\n\\ndata: Second\\ndata: message\\n\\nrest")
+      {:ok,
+        {
+          [
+            %SSE{lines: ["First message"]},
+            %SSE{lines: ["Second", "message"]}
+          ],
+          "rest"
+        }
+      }
+
+      iex> SSE.parse_all("data: This is the first message\\n\\n")
+      {:ok, {[%SSE{lines: ["This is the first message"]}], ""}}
+
+      iex> SSE.parse_all("data: This is the first message\\n\\nrest")
+      {:ok, {[%SSE{lines: ["This is the first message"]}], "rest"}}
+
+      iex> SSE.parse_all("data: This message is not complete")
+      {:ok, {[], "data: This message is not complete"}}
+
+      iex> SSE.parse_all("This line is invalid\\nit doesn't contain a colon\\n")
+      {:error, {:malformed_line, "This line is invalid"}}
+
+      iex> SSE.parse_all("data: This is the first message\\n\\nThis line is invalid\\n")
+      {:error, {:malformed_line, "This line is invalid"}}
+
+      iex> SSE.parse_all("data: This is the first message\\n\\nThis line is yet to terminate")
+      {:ok, {[%SSE{lines: ["This is the first message"]}], "This line is yet to terminate"}}
+
+  """
+  @spec parse_all(String.t) :: {:ok, {[event :: t()], rest :: String.t}}
+  | {:error, term}
+  def parse_all(stream) do
+    case do_parse_all(stream, []) do
+      {:ok, {evts, rest}} ->
+        {:ok, {Enum.reverse(evts), rest}}
+      err ->
+        err
+    end
+  end
+
+  defp do_parse_all(stream, events) do
+    case parse(stream) do
+      {:ok, {nil, rest}} ->
+        {:ok, {events, rest}}
+      {:ok, {evt, rest}} ->
+        do_parse_all(rest, [evt | events])
+      err ->
+        err
+    end
+  end
 
   @doc """
   Parse the next event from text stream, if present.
@@ -129,50 +197,64 @@ defmodule ServerSentEvent do
   *In these examples this module has been aliased to `SSE`*.
 
       iex> SSE.parse("data: This is the first message\\n\\n")
-      {%SSE{lines: ["This is the first message"]}, ""}
+      {:ok, {%SSE{lines: ["This is the first message"]}, ""}}
 
       iex> SSE.parse("data:First whitespace character is optional\\n\\n")
-      {%SSE{lines: ["First whitespace character is optional"]}, ""}
+      {:ok, {%SSE{lines: ["First whitespace character is optional"]}, ""}}
 
       iex> SSE.parse("data: This message\\ndata: has two lines.\\n\\n")
-      {%SSE{lines: ["This message", "has two lines."]}, ""}
+      {:ok, {%SSE{lines: ["This message", "has two lines."]}, ""}}
 
       iex> SSE.parse("data: This is the first message\\n\\nrest")
-      {%SSE{lines: ["This is the first message"]}, "rest"}
+      {:ok, {%SSE{lines: ["This is the first message"]}, "rest"}}
 
       iex> SSE.parse("data: This message is not complete")
-      nil
+      {:ok, {nil, "data: This message is not complete"}}
+
+      iex> SSE.parse("This line is invalid\\nit doesn't contain a colon\\n")
+      {:error, {:malformed_line, "This line is invalid"}}
 
       iex> SSE.parse("event: custom\\ndata: This message is type custom\\n\\n")
-      {%SSE{type: "custom", lines: ["This message is type custom"]}, ""}
+      {:ok, {%SSE{type: "custom", lines: ["This message is type custom"]}, ""}}
 
       iex> SSE.parse("id: 100\\ndata: This message has an id\\n\\n")
-      {%SSE{id: "100", lines: ["This message has an id"]}, ""}
+      {:ok, {%SSE{id: "100", lines: ["This message has an id"]}, ""}}
 
       iex> SSE.parse("retry: 5000\\ndata: This message retries after 5s.\\n\\n")
-      {%SSE{retry: 5000, lines: ["This message retries after 5s."]}, ""}
+      {:ok, {%SSE{retry: 5000, lines: ["This message retries after 5s."]}, ""}}
+
+      iex> SSE.parse("retry: five thousand\\ndata: retry value is not a valid integer\\n\\n")
+      {:error, {:invalid_retry_value, "five thousand"}}
 
       iex> SSE.parse(": This is a comment\\n\\n")
-      {%SSE{comments: ["This is a comment"]}, ""}
+      {:ok, {%SSE{comments: ["This is a comment"]}, ""}}
 
       iex> SSE.parse("data: data can have more :'s in it'\\n\\n")
-      {%SSE{lines: ["data can have more :'s in it'"]}, ""}
+      {:ok, {%SSE{lines: ["data can have more :'s in it'"]}, ""}}
+
+      iex> SSE.parse("DATA: field names are case-sensitive\\n\\n")
+      {:error, {:invalid_field_name, "DATA"}}
+
+      iex> SSE.parse("unknown: what is this field?\\n\\n")
+      {:error, {:invalid_field_name, "unknown"}}
 
   """
   # parse_block block has comments event does not
+  @spec parse(String.t) :: {:ok, {event :: t() | nil, rest :: String.t}}
+  | {:error, term}
   def parse(stream) do
-    do_parse(stream, %__MODULE__{})
+    do_parse(stream, %__MODULE__{}, stream)
   end
 
-  defp do_parse(stream, event) do
+  defp do_parse(stream, event, original) do
     case pop_line(stream) do
       nil ->
-        nil
+        {:ok, {nil, original}}
       {"", rest} ->
-        {event, rest}
+        {:ok, {event, rest}}
       {line, rest} ->
-        event = process_line(line, event)
-        do_parse(rest, event)
+        with {:ok, event} <- process_line(line, event),
+        do: do_parse(rest, event, original)
     end
   end
 
@@ -191,23 +273,32 @@ defmodule ServerSentEvent do
         process_field("comment", value, event)
       [field, value] ->
         process_field(field, value, event)
+      _ ->
+        {:error, {:malformed_line, line}}
     end
   end
 
   defp process_field("event", type, event) do
-    Map.put(event, :type, type)
+    {:ok, Map.put(event, :type, type)}
   end
   defp process_field("data", line, event = %{lines: lines}) do
-    %{event | lines: lines ++ [line]}
+    {:ok, %{event | lines: lines ++ [line]}}
   end
   defp process_field("id", id, event) do
-    Map.put(event, :id, id)
+    {:ok, Map.put(event, :id, id)}
   end
   defp process_field("retry", timeout, event) do
-    {timeout, ""} = Integer.parse(timeout)
-    Map.put(event, :retry, timeout)
+    case Integer.parse(timeout) do
+      {timeout, ""} ->
+        {:ok, Map.put(event, :retry, timeout)}
+      _err ->
+        {:error, {:invalid_retry_value, timeout}}
+    end
   end
   defp process_field("comment", comment, event = %{comments: comments}) do
-    %{event | comments: comments ++ [comment]}
+    {:ok, %{event | comments: comments ++ [comment]}}
+  end
+  defp process_field(other_field_name, _value, _event) do
+    {:error, {:invalid_field_name, other_field_name}}
   end
 end
