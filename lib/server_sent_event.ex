@@ -81,7 +81,7 @@ defmodule ServerSentEvent do
       ...> |> Map.get(:type)
       "update"
   """
-  @spec new(binary(), list()) :: t()
+  @spec new(String.t(), list()) :: t()
   def new(data, opts \\ []) do
     lines = String.split(data, @new_line)
     %__MODULE__{
@@ -104,10 +104,15 @@ defmodule ServerSentEvent do
   @doc """
   Format an event to be sent as part of a stream
 
+  serialize accepts the same arguments as new to create and serialize in one step.
+
   **NOTE:** Each data/comment line must be without new line charachters.
 
   ## Examples
   *In these examples this module has been aliased to `SSE`*.
+
+      iex> SSE.serialize("my data", type: "update")
+      "event: update\\ndata: my data\\n\\n"
 
       iex> %SSE{type: "greeting", lines: ["Hi,", "there"], comments: ["comment"]}
       ...> |> SSE.serialize()
@@ -122,6 +127,7 @@ defmodule ServerSentEvent do
       "data: message setting retry to 10s\\nretry: 10000\\n\\n"
   """
   @spec serialize(event :: t()) :: String.t
+  @spec serialize(String.t, list()) :: String.t
   def serialize(event = %__MODULE__{}) do
     type_line(event)
     ++ comment_lines(event)
@@ -130,6 +136,10 @@ defmodule ServerSentEvent do
     ++ retry_line(event)
     ++ ["\n"]
     |> Enum.join("\n")
+  end
+  def serialize(data, opts \\ []) do
+    new(data, opts)
+    |> serialize()
   end
 
   defp type_line(%{type: nil}) do
