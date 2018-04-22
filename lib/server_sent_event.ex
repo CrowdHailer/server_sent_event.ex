@@ -53,6 +53,46 @@ defmodule ServerSentEvent do
   end
 
   @doc """
+  Create a `ServerSentEvent` struct.
+
+  ## Examples
+
+      iex> SSE.new("my data")
+      ...> |> Map.get(:lines)
+      ["my data"]
+
+      iex> SSE.new("some\\r\\nlines")
+      ...> |> Map.get(:lines)
+      ["some", "lines"]
+
+      iex> SSE.new("some\\nlines")
+      ...> |> Map.get(:lines)
+      ["some", "lines"]
+
+      iex> SSE.new("my data", id: "45")
+      ...> |> Map.get(:id)
+      "45"
+
+      iex> SSE.new("my data", retry: 45)
+      ...> |> Map.get(:retry)
+      45
+
+      iex> SSE.new("my data", type: "update")
+      ...> |> Map.get(:type)
+      "update"
+  """
+  @spec empty?(binary(), list()) :: t()
+  def new(data, opts \\ []) do
+    lines = String.split(data, @new_line)
+    %__MODULE__{
+      type: Keyword.get(opts, :type, nil),
+      lines: lines,
+      id: Keyword.get(opts, :id, nil),
+      retry: Keyword.get(opts, :retry, nil),
+    }
+  end
+
+  @doc """
   Does the event have any data lines.
 
   An event without any data lines will not trigger any browser events.
