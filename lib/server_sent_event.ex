@@ -81,7 +81,7 @@ defmodule ServerSentEvent do
       ...> |> Map.get(:type)
       "update"
   """
-  @spec empty?(binary(), list()) :: t()
+  @spec new(binary(), list()) :: t()
   def new(data, opts \\ []) do
     lines = String.split(data, @new_line)
     %__MODULE__{
