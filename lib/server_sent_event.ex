@@ -29,25 +29,23 @@ defmodule ServerSentEvent do
   @new_line ~r/\R/
 
   @type t :: %__MODULE__{
-    type: nil | String.t,
-    lines: [String.t],
-    id: nil | String.t,
-    retry: nil | integer(),
-    comments: [String.t]
-  }
+          type: nil | String.t(),
+          lines: [String.t()],
+          id: nil | String.t(),
+          retry: nil | integer(),
+          comments: [String.t()]
+        }
 
-  defstruct [
-    type: nil,
-    lines: [],
-    id: nil,
-    retry: nil,
-    comments: []
-  ]
+  defstruct type: nil,
+            lines: [],
+            id: nil,
+            retry: nil,
+            comments: []
 
   @doc """
   This event stream format's MIME type is `text/event-stream`.
   """
-  @spec mime_type() :: String.t
+  @spec mime_type() :: String.t()
   def mime_type() do
     "text/event-stream"
   end
@@ -84,11 +82,12 @@ defmodule ServerSentEvent do
   @spec new(String.t(), list()) :: t()
   def new(data, opts \\ []) do
     lines = String.split(data, @new_line)
+
     %__MODULE__{
       type: Keyword.get(opts, :type, nil),
       lines: lines,
       id: Keyword.get(opts, :id, nil),
-      retry: Keyword.get(opts, :retry, nil),
+      retry: Keyword.get(opts, :retry, nil)
     }
   end
 
@@ -126,17 +125,14 @@ defmodule ServerSentEvent do
       ...> |> SSE.serialize()
       "data: message setting retry to 10s\\nretry: 10000\\n\\n"
   """
-  @spec serialize(event :: t()) :: String.t
-  @spec serialize(String.t, list()) :: String.t
+  @spec serialize(event :: t()) :: String.t()
+  @spec serialize(String.t(), list()) :: String.t()
   def serialize(event = %__MODULE__{}) do
-    type_line(event)
-    ++ comment_lines(event)
-    ++ data_lines(event)
-    ++ id_line(event)
-    ++ retry_line(event)
-    ++ ["\n"]
+    (type_line(event) ++
+       comment_lines(event) ++ data_lines(event) ++ id_line(event) ++ retry_line(event) ++ ["\n"])
     |> Enum.join("\n")
   end
+
   def serialize(data, opts \\ []) do
     new(data, opts)
     |> serialize()
@@ -145,20 +141,21 @@ defmodule ServerSentEvent do
   defp type_line(%{type: nil}) do
     []
   end
+
   defp type_line(%{type: type}) do
     single_line?(type) || raise "Bad"
     ["event: " <> type]
   end
 
   defp comment_lines(%{comments: comments}) do
-    Enum.map(comments, fn(comment) ->
+    Enum.map(comments, fn comment ->
       single_line?(comment) || raise "Bad"
       ": " <> comment
     end)
   end
 
   defp data_lines(%{lines: lines}) do
-    Enum.map(lines, fn(line) ->
+    Enum.map(lines, fn line ->
       single_line?(line) || raise "Bad"
       "data: " <> line
     end)
@@ -167,6 +164,7 @@ defmodule ServerSentEvent do
   defp id_line(%{id: nil}) do
     []
   end
+
   defp id_line(%{id: id}) do
     single_line?(id) || raise "Bad"
     ["id: " <> id]
@@ -175,6 +173,7 @@ defmodule ServerSentEvent do
   defp retry_line(%{retry: nil}) do
     []
   end
+
   defp retry_line(%{retry: retry}) when is_integer(retry) do
     ["retry: " <> to_string(retry)]
   end
@@ -182,6 +181,7 @@ defmodule ServerSentEvent do
   defp single_line?(text) do
     length(String.split(text, @new_line, parts: 2)) == 1
   end
+
   @doc """
   Parse all events from text stream.
 
@@ -218,12 +218,14 @@ defmodule ServerSentEvent do
       {:ok, {[%SSE{lines: ["This is the first message"]}], "This line is yet to terminate"}}
 
   """
-  @spec parse_all(String.t) :: {:ok, {[event :: t()], rest :: String.t}}
-  | {:error, term}
+  @spec parse_all(String.t()) ::
+          {:ok, {[event :: t()], rest :: String.t()}}
+          | {:error, term}
   def parse_all(stream) do
     case do_parse_all(stream, []) do
       {:ok, {evts, rest}} ->
         {:ok, {Enum.reverse(evts), rest}}
+
       err ->
         err
     end
@@ -233,8 +235,10 @@ defmodule ServerSentEvent do
     case parse(stream) do
       {:ok, {nil, rest}} ->
         {:ok, {events, rest}}
+
       {:ok, {evt, rest}} ->
         do_parse_all(rest, [evt | events])
+
       err ->
         err
     end
@@ -290,8 +294,9 @@ defmodule ServerSentEvent do
 
   """
   # parse_block block has comments event does not
-  @spec parse(String.t) :: {:ok, {event :: t() | nil, rest :: String.t}}
-  | {:error, term}
+  @spec parse(String.t()) ::
+          {:ok, {event :: t() | nil, rest :: String.t()}}
+          | {:error, term}
   def parse(stream) do
     do_parse(stream, %__MODULE__{}, stream)
   end
@@ -300,11 +305,13 @@ defmodule ServerSentEvent do
     case pop_line(stream) do
       nil ->
         {:ok, {nil, original}}
+
       {"", rest} ->
         {:ok, {event, rest}}
+
       {line, rest} ->
         with {:ok, event} <- process_line(line, event),
-        do: do_parse(rest, event, original)
+             do: do_parse(rest, event, original)
     end
   end
 
@@ -312,6 +319,7 @@ defmodule ServerSentEvent do
     case String.split(stream, @new_line, parts: 2) do
       [^stream] ->
         nil
+
       [line, rest] ->
         {line, rest}
     end
@@ -321,8 +329,10 @@ defmodule ServerSentEvent do
     case String.split(line, ~r/: ?/, parts: 2) do
       ["", value] ->
         process_field("comment", value, event)
+
       [field, value] ->
         process_field(field, value, event)
+
       _ ->
         {:error, {:malformed_line, line}}
     end
@@ -331,23 +341,29 @@ defmodule ServerSentEvent do
   defp process_field("event", type, event) do
     {:ok, Map.put(event, :type, type)}
   end
+
   defp process_field("data", line, event = %{lines: lines}) do
     {:ok, %{event | lines: lines ++ [line]}}
   end
+
   defp process_field("id", id, event) do
     {:ok, Map.put(event, :id, id)}
   end
+
   defp process_field("retry", timeout, event) do
     case Integer.parse(timeout) do
       {timeout, ""} ->
         {:ok, Map.put(event, :retry, timeout)}
+
       _err ->
         {:error, {:invalid_retry_value, timeout}}
     end
   end
+
   defp process_field("comment", comment, event = %{comments: comments}) do
     {:ok, %{event | comments: comments ++ [comment]}}
   end
+
   defp process_field(other_field_name, _value, _event) do
     {:error, {:invalid_field_name, other_field_name}}
   end
