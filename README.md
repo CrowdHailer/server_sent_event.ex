@@ -1,6 +1,6 @@
 # ServerSentEvent
 
-**Push updates to Web clients over HTTP or using dedicated server-push protocol.**
+**Push updates to web clients over HTTP, using dedicated server-push protocol.**
 
 - [Install from Hex](https://hex.pm/packages/server_sent_event)
 - [Documentation available on hexdoc](https://hexdocs.pm/server_sent_event)
