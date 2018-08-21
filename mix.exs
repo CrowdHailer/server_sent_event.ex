@@ -24,6 +24,7 @@ defmodule ServerSentEvent.Mixfile do
 
   defp deps do
     [
+      {:raxx, "~> 0.15.7"},
       {:dialyxir, "~> 0.5", only: [:dev, :test], runtime: false},
       {:ex_doc, ">= 0.0.0", only: :dev}
     ]
