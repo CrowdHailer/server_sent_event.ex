@@ -239,37 +239,43 @@ defmodule ServerSentEvent.Client do
         case :gen_tcp.connect(host, port, options, 2_000) do
           {:ok, socket} ->
             {:ok, {:tcp, socket}}
+
+          {:error, reason} ->
+            {:error, reason}
         end
 
       :https ->
         case :ssl.connect(host, port, options, 2_000) do
           {:ok, socket} ->
             {:ok, {:ssl, socket}}
+
+          {:error, reason} ->
+            {:error, reason}
         end
     end
   end
 
-  def set_active({:tcp, socket}) do
+  defp set_active({:tcp, socket}) do
     :inet.setopts(socket, active: :once)
   end
 
-  def set_active({:ssl, socket}) do
+  defp set_active({:ssl, socket}) do
     :ssl.setopts(socket, active: :once)
   end
 
-  def send_data({:tcp, socket}, message) do
+  defp send_data({:tcp, socket}, message) do
     :gen_tcp.send(socket, message)
   end
 
-  def send_data({:ssl, socket}, message) do
+  defp send_data({:ssl, socket}, message) do
     :ssl.send(socket, message)
   end
 
-  def recv({:tcp, socket}, bytes, timeout) do
+  defp recv({:tcp, socket}, bytes, timeout) do
     :gen_tcp.recv(socket, bytes, timeout)
   end
 
-  def recv({:ssl, socket}, bytes, timeout) do
+  defp recv({:ssl, socket}, bytes, timeout) do
     :ssl.recv(socket, bytes, timeout)
   end
 end
