@@ -8,6 +8,10 @@
 - [Install from Hex](https://hex.pm/packages/server_sent_event)
 - [Documentation available on hexdoc](https://hexdocs.pm/server_sent_event)
 
+### Server Sent Event Standard
+
+https://html.spec.whatwg.org/#server-sent-events
+
 ## Usage
 
 ```elixir

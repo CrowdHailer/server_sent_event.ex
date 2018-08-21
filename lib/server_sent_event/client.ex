@@ -1,17 +1,17 @@
 defmodule ServerSentEvent.Client do
-  @moduledoc """
+  @moduledoc ~S"""
   Client that pulls and processes events from a server sent event stream.
-
-  Definition of the server sent event standard
-  https://html.spec.whatwg.org/#server-sent-events
 
   This client can be used to manage reconnecting a dropped connection.
 
-  A specific process that is consuming events needs to implement the callbacks from this behaviour.
+  A specific client needs to implement the callbacks from this behaviour.
+  Note there is no `use` macro in this module, therefore all callbacks must be implemented.
 
   ## Example
 
       defmodule AutoConnect do
+        @behaviour ServerSentEvent.Client
+
         # Start connecting to the endpoint as soon as client is started.
         def init(state) do
           {:connect, request(state), state}
@@ -36,7 +36,7 @@ defmodule ServerSentEvent.Client do
         # Update the running state of the client with the id of each event as it arrives.
         # This event id is used for reconnection.
         def handle_event(event, state) do
-          IO.puts("I just got a new event: \#{inspect(event)}")
+          IO.puts("I just got a new event: #{inspect(event)}")
           %{state | last_event_id: event.id}
         end
 
@@ -63,9 +63,25 @@ defmodule ServerSentEvent.Client do
       ]
   """
 
+  @typedoc """
+  State of the client process.
+
+  The initial value of this state given as the second argument to start_link/3
+  """
   @type state :: term
+
   @type request :: Raxx.Request.t()
   @type response :: Raxx.Response.t()
+
+  @typedoc """
+  Return value from any callback, except `handle_event/2`
+
+  This value instructs the client process with what it should do next
+
+  - `:connect` start the process of connection to an event source, using the request given.
+  - `:noreply` do nothing, and wait for next message.
+  - `:stop` stop the client and exit with reason.
+  """
   @type return :: {:connect, request, state} | {:noreply, state} | {:stop, atom, state}
   @callback init(state) :: {:connect, request, state} | {:ok, state}
   @callback handle_connect(response, state) :: return
@@ -78,6 +94,7 @@ defmodule ServerSentEvent.Client do
   @enforce_keys [:module, :internal_state, :socket, :chunk_buffer, :sse_buffer]
   defstruct @enforce_keys
 
+  @spec start(module, state, GenServer.options()) :: GenServer.on_start()
   def start(module, internal_state, options \\ []) do
     state = %__MODULE__{
       module: module,
@@ -90,6 +107,7 @@ defmodule ServerSentEvent.Client do
     GenServer.start(__MODULE__, state, options)
   end
 
+  @spec start_link(module, state, GenServer.options()) :: GenServer.on_start()
   def start_link(module, internal_state, options \\ []) do
     state = %__MODULE__{
       module: module,
