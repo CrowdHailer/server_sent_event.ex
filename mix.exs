@@ -5,7 +5,7 @@ defmodule ServerSentEvent.Mixfile do
     [
       app: :server_sent_event,
       version: "0.3.1",
-      elixir: "~> 1.4",
+      elixir: "~> 1.7",
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -19,11 +19,12 @@ defmodule ServerSentEvent.Mixfile do
   end
 
   def application do
-    [extra_applications: [:logger]]
+    [extra_applications: [:logger, :ssl]]
   end
 
   defp deps do
     [
+      {:raxx, "~> 0.15.7"},
       {:dialyxir, "~> 0.5", only: [:dev, :test], runtime: false},
       {:ex_doc, ">= 0.0.0", only: :dev}
     ]
