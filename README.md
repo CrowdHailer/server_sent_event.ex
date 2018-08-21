@@ -14,6 +14,8 @@ https://html.spec.whatwg.org/#server-sent-events
 
 ## Usage
 
+### Parsing and Serializing
+
 ```elixir
 iex(1)> event = ServerSentEvent.new("my data")
 %ServerSentEvent{
@@ -38,6 +40,11 @@ iex(3)> {:ok, {^event, ""}} = ServerSentEvent.parse(binary)
   }, ""}}
 
 ```
+
+### Client
+
+This project also includes a general purpose client.
+See documentation for `ServerSentEvent.Client` for more information.
 
 ## Testing
 
