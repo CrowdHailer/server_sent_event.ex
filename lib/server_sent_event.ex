@@ -244,59 +244,70 @@ defmodule ServerSentEvent do
     end
   end
 
-  @doc """
+  @doc ~S"""
   Parse the next event from text stream, if present.
 
   ## Examples
   *In these examples this module has been aliased to `SSE`*.
 
-      iex> SSE.parse("data: This is the first message\\n\\n")
+      iex> SSE.parse("data: This is the first message\n\n")
       {:ok, {%SSE{lines: ["This is the first message"]}, ""}}
 
-      iex> SSE.parse("data:First whitespace character is optional\\n\\n")
+      iex> SSE.parse("data:First whitespace character is optional\n\n")
       {:ok, {%SSE{lines: ["First whitespace character is optional"]}, ""}}
 
-      iex> SSE.parse("data: This message\\ndata: has two lines.\\n\\n")
+      iex> SSE.parse("data: This message\ndata: has two lines.\n\n")
       {:ok, {%SSE{lines: ["This message", "has two lines."]}, ""}}
 
-      iex> SSE.parse("data: This is the first message\\n\\nrest")
+      iex> SSE.parse("data: This is the first message\n\nrest")
       {:ok, {%SSE{lines: ["This is the first message"]}, "rest"}}
 
       iex> SSE.parse("data: This message is not complete")
       {:ok, {nil, "data: This message is not complete"}}
 
-      iex> SSE.parse("This line is invalid\\nit doesn't contain a colon\\n")
+      iex> SSE.parse("This line is invalid\nit doesn't contain a colon\n")
       {:error, {:malformed_line, "This line is invalid"}}
 
-      iex> SSE.parse("event: custom\\ndata: This message is type custom\\n\\n")
+      iex> SSE.parse("event: custom\ndata: This message is type custom\n\n")
       {:ok, {%SSE{type: "custom", lines: ["This message is type custom"]}, ""}}
 
-      iex> SSE.parse("id: 100\\ndata: This message has an id\\n\\n")
+      iex> SSE.parse("id: 100\ndata: This message has an id\n\n")
       {:ok, {%SSE{id: "100", lines: ["This message has an id"]}, ""}}
 
-      iex> SSE.parse("retry: 5000\\ndata: This message retries after 5s.\\n\\n")
+      iex> SSE.parse("retry: 5000\ndata: This message retries after 5s.\n\n")
       {:ok, {%SSE{retry: 5000, lines: ["This message retries after 5s."]}, ""}}
 
-      iex> SSE.parse("retry: five thousand\\ndata: retry value is not a valid integer\\n\\n")
+      iex> SSE.parse("retry: five thousand\ndata: retry value is not a valid integer\n\n")
       {:error, {:invalid_retry_value, "five thousand"}}
 
-      iex> SSE.parse(": This is a comment\\n\\n")
+      iex> SSE.parse(": This is a comment\n\n")
       {:ok, {%SSE{comments: ["This is a comment"]}, ""}}
 
-      iex> SSE.parse("data: data can have more :'s in it'\\n\\n")
+      iex> SSE.parse("data: data can have more :'s in it'\n\n")
       {:ok, {%SSE{lines: ["data can have more :'s in it'"]}, ""}}
 
-      iex> SSE.parse("DATA: field names are case-sensitive\\n\\n")
+      iex> SSE.parse("DATA: field names are case-sensitive\n\n")
       {:error, {:invalid_field_name, "DATA"}}
 
-      iex> SSE.parse("unknown: what is this field?\\n\\n")
+      iex> SSE.parse("unknown: what is this field?\n\n")
       {:error, {:invalid_field_name, "unknown"}}
 
+      # It is possible for an event stream using `CRLF` to be split mid line delimiter.
+      # In this case the parser needs to clear the leading newline character.
+      iex> SSE.parse("data: This is the first message\r\n\r")
+      {:ok, {%SSE{lines: ["This is the first message"]}, ""}}
+
+      iex> SSE.parse("\ndata: This is the second message\r\n\r\n")
+      {:ok, {%SSE{lines: ["This is the second message"]}, ""}}
   """
   # parse_block block has comments event does not
   @spec parse(String.t()) ::
           {:ok, {event :: t() | nil, rest :: String.t()}}
           | {:error, term}
+  def parse(<<lead_charachter, rest::binary>>) when lead_charachter in [?\r, ?\n] do
+    parse(rest)
+  end
+
   def parse(stream) do
     do_parse(stream, %__MODULE__{}, stream)
   end
