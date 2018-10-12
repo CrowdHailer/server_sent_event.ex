@@ -136,11 +136,21 @@ defmodule ServerSentEvent.Client do
     case start_streaming(request, state) do
       {:ok, {response, state}} ->
         if response do
-          state.module.handle_connect(response, state.internal_state)
+          case wrap_response(state.module.handle_connect(response, state.internal_state), state) do
+            # Maybe we should stop here without handling the packet?
+            {:stop, request, state} ->
+              {:stop, request, handle_packet("", state)}
+
+            {:noreply, state} ->
+              {:noreply, handle_packet("", state)}
+
+            # This case is a no-op but handled elsewhere
+            {:noreply, state, continuation} ->
+              {:noreply, handle_packet("", state), continuation}
+          end
         else
-          {:noreply, state.internal_state}
+          wrap_response({:noreply, state.internal_state}, state)
         end
-        |> wrap_response(state)
 
       {:error, reason} ->
         state.module.handle_connect_failure(reason, state.internal_state)
@@ -151,6 +161,24 @@ defmodule ServerSentEvent.Client do
   @impl GenServer
   def handle_info({transport, socket, packet}, state = %__MODULE__{socket: {transport, socket}})
       when transport in [:tcp, :ssl] do
+    state = handle_packet(packet, state)
+    {:noreply, state}
+  end
+
+  def handle_info({transport_closed, socket}, state = %{socket: {_transport, socket}})
+      when transport_closed in [:tcp_closed, :ssl_closed] do
+    state = %{state | socket: nil}
+
+    state.module.handle_disconnect({:ok, :closed}, state.internal_state)
+    |> wrap_response(%{state | chunk_buffer: "", sse_buffer: ""})
+  end
+
+  def handle_info(other, state) do
+    state.module.handle_info(other, state.internal_state)
+    |> wrap_response(state)
+  end
+
+  def handle_packet(packet, state) do
     # As we are running the server, raising an error for badly formatted events
     {:ok, {chunks, chunk_buffer}} = pop_all_chunks(state.chunk_buffer <> packet)
 
@@ -163,21 +191,7 @@ defmodule ServerSentEvent.Client do
     internal_state =
       Enum.reduce(events, state.internal_state, fn e, s -> state.module.handle_event(e, s) end)
 
-    {:noreply,
-     %{state | internal_state: internal_state, chunk_buffer: chunk_buffer, sse_buffer: sse_buffer}}
-  end
-
-  def handle_info({transport_closed, socket}, state = %{socket: {_transport, socket}})
-      when transport_closed in [:tcp_closed, :ssl_closed] do
-    state = %{state | socket: nil}
-
-    state.module.handle_disconnect({:ok, :closed}, state.internal_state)
-    |> wrap_response(state)
-  end
-
-  def handle_info(other, state) do
-    state.module.handle_info(other, state.internal_state)
-    |> wrap_response(state)
+    %{state | internal_state: internal_state, chunk_buffer: chunk_buffer, sse_buffer: sse_buffer}
   end
 
   defp start_streaming(request, state = %{socket: nil}) do

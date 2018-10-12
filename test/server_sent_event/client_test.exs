@@ -23,7 +23,7 @@ defmodule ServerSentEvent.ClientTest do
   @first_response head
   @event Raxx.HTTP1.serialize_chunk(ServerSentEvent.serialize("first"))
 
-  test "connection can be auto triggered from start up" do
+  test "Each server sent event is processed as it is received" do
     {port, listen_socket} = listen()
     {:ok, _client} = AutoConnect.start_link(port)
 
@@ -32,10 +32,15 @@ defmodule ServerSentEvent.ClientTest do
     assert String.contains?(first_request, "accept: text/event-stream")
     assert String.contains?(first_request, "\r\n\r\n")
 
-    :ok = :gen_tcp.send(socket, @first_response)
+    :ok = :gen_tcp.send(socket, [@first_response, @event])
     assert_receive {:connect, response = %Raxx.Response{}}, 5_000
     assert response.status == 200
     assert Raxx.get_header(response, "content-type") == "text/event-stream"
+
+    assert_receive %ServerSentEvent{lines: ["first"]}, 5_000
+
+    :ok = :gen_tcp.send(socket, Raxx.HTTP1.serialize_chunk(ServerSentEvent.serialize("second")))
+    assert_receive %ServerSentEvent{lines: ["second"]}, 5_000
   end
 
   test "connection can be delayed at start up, and manual started" do
@@ -117,15 +122,22 @@ defmodule ServerSentEvent.ClientTest do
     assert String.contains?(first_request, "\r\n\r\n")
 
     :ok = :gen_tcp.send(socket, @first_response)
+    :ok = :gen_tcp.send(socket, Raxx.HTTP1.serialize_chunk("data:"))
     assert_receive {:connect, _response}, 5_000
 
     :ok = :gen_tcp.close(socket)
     assert_receive {:disconnect, {:ok, :closed}}, 5_000
 
     {:ok, socket} = accept(listen_socket)
-    {:ok, first_request} = :gen_tcp.recv(socket, 0, 1_000)
-    assert String.contains?(first_request, "accept: text/event-stream")
-    assert String.contains?(first_request, "\r\n\r\n")
+    {:ok, reconnect_request} = :gen_tcp.recv(socket, 0, 1_000)
+    assert String.contains?(reconnect_request, "accept: text/event-stream")
+    assert String.contains?(reconnect_request, "\r\n\r\n")
+
+    :ok = :gen_tcp.send(socket, @first_response)
+    :ok = :gen_tcp.send(socket, @event)
+
+    assert_receive {:connect, _response}, 5_000
+    assert_receive %ServerSentEvent{lines: ["first"]}, 5_000
   end
 
   test "connection can stay unconnected after disconnect" do
