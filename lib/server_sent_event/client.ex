@@ -170,7 +170,7 @@ defmodule ServerSentEvent.Client do
     state = %{state | socket: nil}
 
     state.module.handle_disconnect({:ok, :closed}, state.internal_state)
-    |> wrap_response(state)
+    |> wrap_response(%{state | chunk_buffer: "", sse_buffer: ""})
   end
 
   def handle_info(other, state) do

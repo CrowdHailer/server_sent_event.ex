@@ -8,4 +8,5 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Fixed
 
-- `ServerSentEvent.Client` now processes events that are part of first received packet
+- `ServerSentEvent.Client` now processes events that are received as part of first received packet.
+- `ServerSentEvent.Client` clears buffers in response to a disconnect.
