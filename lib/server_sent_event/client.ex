@@ -137,16 +137,16 @@ defmodule ServerSentEvent.Client do
       {:ok, {response, state}} ->
         if response do
           case wrap_response(state.module.handle_connect(response, state.internal_state), state) do
-            # This case is a no-op but handled elsewhere
-            {:connect, request, state} ->
-              {:connect, request, handle_packet("", state)}
-
             # Maybe we should stop here without handling the packet?
             {:stop, request, state} ->
               {:stop, request, handle_packet("", state)}
 
             {:noreply, state} ->
               {:noreply, handle_packet("", state)}
+
+            # This case is a no-op but handled elsewhere
+            {:noreply, state, continuation} ->
+              {:noreply, handle_packet("", state), continuation}
           end
         else
           wrap_response({:noreply, state.internal_state}, state)
