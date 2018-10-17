@@ -186,7 +186,10 @@ defmodule ServerSentEvent.Client do
       ServerSentEvent.parse_all(state.sse_buffer <> :erlang.iolist_to_binary(chunks))
 
     # Call active before processing events in case event processing is slow
-    :ok = set_active(state.socket)
+    # Return value is `:ok` or `{:error, reason}`, reason is most likely `:closed`.
+    # The socket has already been set to active.
+    # A :tcp_closed message will be received in case of socket closing, shutdown of this process is handled their.
+    _ = set_active(state.socket)
 
     internal_state =
       Enum.reduce(events, state.internal_state, fn e, s -> state.module.handle_event(e, s) end)
