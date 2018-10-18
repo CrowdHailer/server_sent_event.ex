@@ -1,10 +1,3 @@
-support_dir = Path.join(__DIR__, "client_test")
-
-Code.require_file("auto_connect.ex", support_dir)
-Code.require_file("manual_connect.ex", support_dir)
-Code.require_file("auto_stop.ex", support_dir)
-Code.require_file("hang_forever.ex", support_dir)
-
 defmodule ServerSentEvent.ClientTest do
   use ExUnit.Case, async: true
 

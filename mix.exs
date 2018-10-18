@@ -14,7 +14,8 @@ defmodule ServerSentEvent.Mixfile do
       ],
       description: description(),
       docs: [extras: ["README.md"], main: "ServerSentEvent"],
-      package: package()
+      package: package(),
+      elixirc_paths: elixirc_paths(Mix.env),
     ]
   end
 
@@ -26,7 +27,9 @@ defmodule ServerSentEvent.Mixfile do
     [
       {:raxx, "~> 0.16.0"},
       {:dialyxir, "~> 0.5", only: [:dev, :test], runtime: false},
-      {:ex_doc, ">= 0.0.0", only: :dev}
+      {:ex_doc, ">= 0.0.0", only: :dev},
+      {:stream_data, "~> 0.4.2", only: :test},
+      {:mix_test_watch, "~> 0.9.0", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -44,4 +47,9 @@ defmodule ServerSentEvent.Mixfile do
       links: %{"GitHub" => "https://github.com/CrowdHailer/server_sent_event.ex"}
     ]
   end
+
+  # Specifies which paths to compile per environment
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+
+  defp elixirc_paths(_),     do: ["lib"]
 end
