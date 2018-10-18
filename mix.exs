@@ -15,7 +15,7 @@ defmodule ServerSentEvent.Mixfile do
       description: description(),
       docs: [extras: ["README.md"], main: "ServerSentEvent"],
       package: package(),
-      elixirc_paths: elixirc_paths(Mix.env),
+      elixirc_paths: elixirc_paths(Mix.env())
     ]
   end
 
@@ -51,5 +51,5 @@ defmodule ServerSentEvent.Mixfile do
   # Specifies which paths to compile per environment
   defp elixirc_paths(:test), do: ["lib", "test/support"]
 
-  defp elixirc_paths(_),     do: ["lib"]
+  defp elixirc_paths(_), do: ["lib"]
 end

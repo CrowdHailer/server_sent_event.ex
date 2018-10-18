@@ -43,13 +43,49 @@ defmodule ServerSentEvent.ClientPropertyTest do
       assert_receive %ServerSentEvent{lines: ["second"]}, 5_000
 
       # cleanup, otherwise we run out of ports/sockets/file descriptors
-      send client, :stop
+      send(client, :stop)
+      :ok = :gen_tcp.close(socket)
+    end
+  end
+
+  test "the client will reconstruct sses regardless of how they get split between packets" do
+    check all sses <- StreamData.list_of(any_sse(), max_length: 10),
+              _int <- StreamData.list_of(StreamData.integer(0..10_000), max_length: 20) do
+      # preparation
+
+      # action
+      {port, listen_socket} = listen()
+      {:ok, client} = AutoConnect.start_link(port)
+
+      {:ok, socket} = accept(listen_socket)
+      {:ok, first_request} = :gen_tcp.recv(socket, 0, 1_000)
+      assert String.contains?(first_request, "accept: text/event-stream")
+      assert String.contains?(first_request, "\r\n\r\n")
+
+      :ok = :gen_tcp.send(socket, [@first_response])
+      assert_receive {:connect, response = %Raxx.Response{}}, 5_000
+      assert response.status == 200
+      assert response.body == true
+      assert Raxx.get_header(response, "content-type") == "text/event-stream"
+
+      Enum.each(sses, fn sse ->
+        :ok = :gen_tcp.send(socket, Raxx.HTTP1.serialize_chunk(ServerSentEvent.serialize(sse)))
+        Process.sleep(1)
+      end)
+
+      Enum.each(sses, fn sse ->
+        received = assert_receive %ServerSentEvent{}, 5_000
+        assert sse == received
+      end)
+
+      # cleanup, otherwise we run out of ports/sockets/file descriptors
+      send(client, :stop)
       :ok = :gen_tcp.close(socket)
     end
   end
 
   test "an sse can carry any string" do
-    check all string <- non_empty_ascii_string() do
+    check all string <- ascii_string_with_newlines() do
       sse = ServerSentEvent.new(string)
       assert sse.lines != []
     end
@@ -58,11 +94,12 @@ defmodule ServerSentEvent.ClientPropertyTest do
   test "simple sse generation" do
     check all sse <- simple_sse() do
       assert %ServerSentEvent{
-        lines: lines,
-        id: id,
-        comments: [],
-        type: type
-      } = sse
+               lines: lines,
+               id: id,
+               comments: [],
+               type: type
+             } = sse
+
       assert is_binary(id)
       assert is_list(lines)
       assert Enum.all?(lines, &String.valid?(&1))
@@ -73,8 +110,9 @@ defmodule ServerSentEvent.ClientPropertyTest do
   test "comment sse generation" do
     check all sse <- comment_sse() do
       assert %ServerSentEvent{
-        comments: comments
-      } = sse
+               comments: comments
+             } = sse
+
       assert is_list(comments)
       assert Enum.all?(comments, &String.valid?(&1))
     end
@@ -85,18 +123,9 @@ defmodule ServerSentEvent.ClientPropertyTest do
       serialized =
         sses
         |> Enum.map(&ServerSentEvent.serialize/1)
-        |> Enum.join("\n\n")
-      assert {:ok, {^sses, ""}} = ServerSentEvent.parse_all(serialized <> "\n\n")
-    end
-  end
+        |> Enum.join("")
 
-  test "filtering" do
-    non_empty_strings =
-      StreamData.string(:ascii)
-      |> StreamData.filter(& &1 != "")
-
-    check all nes <- non_empty_strings do
-      assert nes != ""
+      assert {:ok, {^sses, ""}} = ServerSentEvent.parse_all(serialized)
     end
   end
 
@@ -107,15 +136,14 @@ defmodule ServerSentEvent.ClientPropertyTest do
     ])
   end
 
-  def non_empty_ascii_string do
+  def ascii_string_with_newlines do
     StreamData.string(:ascii)
     |> StreamData.list_of()
     |> StreamData.map(&Enum.join(&1, "\n"))
-    |> StreamData.filter(& &1 != "")
   end
 
   def simple_sse() do
-    data = non_empty_ascii_string()
+    data = ascii_string_with_newlines()
     int_id = StreamData.positive_integer()
     type = StreamData.member_of(["foo", "bar", "baz"])
 
@@ -124,11 +152,14 @@ defmodule ServerSentEvent.ClientPropertyTest do
     |> StreamData.map(fn {data, int_id, type} ->
       id = Integer.to_string(int_id)
       sse = ServerSentEvent.new(data)
+
       %ServerSentEvent{
-        sse | id: id, type: type
+        sse
+        | id: id,
+          type: type
       }
     end)
-    |> StreamData.filter(& &1.lines != [])
+    |> StreamData.filter(&(&1.lines != []))
   end
 
   def comment_sse() do
