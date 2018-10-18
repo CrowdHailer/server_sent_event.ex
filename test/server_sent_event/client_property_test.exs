@@ -4,12 +4,6 @@ defmodule ServerSentEvent.ClientPropertyTest do
 
   @moduletag :property
 
-  test "sample test" do
-    check all int1 <- StreamData.integer(), int2 <- StreamData.integer() do
-      assert int1 + int2 == int2 + int1
-    end
-  end
-
   alias ServerSentEvent.ClientTest.AutoConnect
 
   {head, :chunked} =
@@ -20,39 +14,12 @@ defmodule ServerSentEvent.ClientPropertyTest do
     )
 
   @first_response head
-  @event Raxx.HTTP1.serialize_chunk(ServerSentEvent.serialize("first"))
-
-  test "Each server sent event is processed as it is received" do
-    check all _int <- StreamData.integer(), max_runs: 1_000, max_run_time: 1_000 do
-      {port, listen_socket} = listen()
-      {:ok, client} = AutoConnect.start_link(port)
-
-      {:ok, socket} = accept(listen_socket)
-      {:ok, first_request} = :gen_tcp.recv(socket, 0, 1_000)
-      assert String.contains?(first_request, "accept: text/event-stream")
-      assert String.contains?(first_request, "\r\n\r\n")
-
-      :ok = :gen_tcp.send(socket, [@first_response, @event])
-      assert_receive {:connect, response = %Raxx.Response{}}, 5_000
-      assert response.status == 200
-      assert Raxx.get_header(response, "content-type") == "text/event-stream"
-
-      assert_receive %ServerSentEvent{lines: ["first"]}, 5_000
-
-      :ok = :gen_tcp.send(socket, Raxx.HTTP1.serialize_chunk(ServerSentEvent.serialize("second")))
-      assert_receive %ServerSentEvent{lines: ["second"]}, 5_000
-
-      # cleanup, otherwise we run out of ports/sockets/file descriptors
-      send(client, :stop)
-      :ok = :gen_tcp.close(socket)
-    end
-  end
 
   test "the client will reconstruct sses regardless of how they get split between packets" do
     check all sses <- StreamData.list_of(any_sse(), min_length: 1, max_length: 20),
               split_points <- StreamData.list_of(StreamData.integer(0..10_000), max_length: 100),
               sses_in_chunk <- StreamData.integer(1..3),
-              max_runs: 500,
+              max_runs: 600,
               max_run_time: 10_000 do
       # preparing the connection
       {port, listen_socket} = listen()
@@ -96,7 +63,8 @@ defmodule ServerSentEvent.ClientPropertyTest do
 
       Enum.each(packets, fn packet ->
         :ok = :gen_tcp.send(socket, packet)
-        Process.sleep(2)
+        # try to make sure erlang's magic is not going to merge the packets
+        Process.sleep(1)
       end)
 
       Enum.each(sses, fn sse ->
@@ -107,13 +75,6 @@ defmodule ServerSentEvent.ClientPropertyTest do
       # cleanup, otherwise we run out of ports/sockets/file descriptors
       send(client, :stop)
       :ok = :gen_tcp.close(socket)
-    end
-  end
-
-  test "an sse can carry any string" do
-    check all string <- ascii_string_with_newlines() do
-      sse = ServerSentEvent.new(string)
-      assert sse.lines != []
     end
   end
 
