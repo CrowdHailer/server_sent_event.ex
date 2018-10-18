@@ -49,11 +49,12 @@ defmodule ServerSentEvent.ClientPropertyTest do
   end
 
   test "the client will reconstruct sses regardless of how they get split between packets" do
-    check all sses <- StreamData.list_of(any_sse(), max_length: 10),
-              _int <- StreamData.list_of(StreamData.integer(0..10_000), max_length: 20) do
-      # preparation
-
-      # action
+    check all sses <- StreamData.list_of(any_sse(), min_length: 1, max_length: 20),
+              split_points <- StreamData.list_of(StreamData.integer(0..10_000), max_length: 100),
+              sses_in_chunk <- StreamData.integer(1..3),
+              max_runs: 500,
+              max_run_time: 10_000 do
+      # preparing the connection
       {port, listen_socket} = listen()
       {:ok, client} = AutoConnect.start_link(port)
 
@@ -68,9 +69,34 @@ defmodule ServerSentEvent.ClientPropertyTest do
       assert response.body == true
       assert Raxx.get_header(response, "content-type") == "text/event-stream"
 
-      Enum.each(sses, fn sse ->
-        :ok = :gen_tcp.send(socket, Raxx.HTTP1.serialize_chunk(ServerSentEvent.serialize(sse)))
-        Process.sleep(1)
+      # preparing the response
+      whole_response =
+        sses
+        |> Enum.map(&ServerSentEvent.serialize(&1))
+        |> Enum.chunk_every(sses_in_chunk)
+        |> Enum.map(&Enum.join(&1, ""))
+        |> Enum.map(&Raxx.HTTP1.serialize_chunk/1)
+        |> Enum.join("")
+
+      response_length = byte_size(whole_response)
+
+      split_pairs =
+        split_points
+        |> Enum.reject(&(&1 >= response_length))
+        |> (fn points -> points ++ [0, response_length] end).()
+        |> Enum.uniq()
+        |> Enum.sort()
+        |> Enum.chunk_every(2, 1, :discard)
+
+      packets =
+        split_pairs
+        |> Enum.map(fn [from, to] -> binary_part(whole_response, from, to - from) end)
+
+      assert Enum.join(packets, "") == whole_response
+
+      Enum.each(packets, fn packet ->
+        :ok = :gen_tcp.send(socket, packet)
+        Process.sleep(2)
       end)
 
       Enum.each(sses, fn sse ->
