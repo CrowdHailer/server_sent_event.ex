@@ -64,7 +64,7 @@ defmodule ServerSentEvent.ClientPropertyTest do
       Enum.each(packets, fn packet ->
         :ok = :gen_tcp.send(socket, packet)
         # try to make sure erlang's magic is not going to merge the packets
-        Process.sleep(1)
+        Process.sleep(10)
       end)
 
       Enum.each(sses, fn sse ->
@@ -124,9 +124,17 @@ defmodule ServerSentEvent.ClientPropertyTest do
   end
 
   def ascii_string_with_newlines do
-    StreamData.string(:ascii)
-    |> StreamData.list_of()
-    |> StreamData.map(&Enum.join(&1, "\n"))
+    lines =
+      StreamData.string(:ascii)
+      |> StreamData.list_of()
+
+    new_line_string = StreamData.member_of(["\n", "\r\n", "\r"])
+
+    {lines, new_line_string}
+    |> StreamData.tuple()
+    |> StreamData.map(fn {lines, new_line_string} ->
+      Enum.join(lines, new_line_string)
+    end)
   end
 
   def simple_sse() do
