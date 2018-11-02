@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [0.4.4](https://github.com/CrowdHailer/server_sent_event.ex/tree/0.4.3) - 2018-10-21
+## [0.4.5](https://github.com/CrowdHailer/server_sent_event.ex/tree/0.4.5) - 2018-11-02
+
+### Added
+
+- Support for [Raxx 0.17.x](https://hex.pm/packages/raxx/0.17.0)
+
+## [0.4.4](https://github.com/CrowdHailer/server_sent_event.ex/tree/0.4.4) - 2018-10-21
 
 ### Fixed
 

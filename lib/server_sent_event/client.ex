@@ -206,7 +206,7 @@ defmodule ServerSentEvent.Client do
               [head, data]
 
             {_head, _body_state} ->
-              raise "ServerSentEvent.Client must be started with a complete request, use `Raxx.set_body/1`"
+              raise "ServerSentEvent.Client must be started with a complete request."
           end
 
         case send_data(socket, binary) do

@@ -51,6 +51,5 @@ defmodule ServerSentEvent.ClientTest.ManualConnect do
   defp request(state) do
     Raxx.request(:GET, "http://localhost:#{state.port}/events")
     |> Raxx.set_header("accept", "text/event-stream")
-    |> Raxx.set_body("")
   end
 end
