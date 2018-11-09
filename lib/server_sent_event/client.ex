@@ -211,22 +211,7 @@ defmodule ServerSentEvent.Client do
 
         case send_data(socket, binary) do
           :ok ->
-            case recv(socket, 0, 2_000) do
-              {:ok, packet} ->
-                :ok = set_active(socket)
-
-                case Raxx.HTTP1.parse_response(packet) do
-                  {:ok, {response, _connection_state, :chunked, chunk_buffer}} ->
-                    state = %{state | socket: socket, chunk_buffer: chunk_buffer}
-                    {:ok, {response, state}}
-
-                  {:ok, {response, _connection_state, _body_read_state, _buffer}} ->
-                    {:error, {:bad_response, response}}
-                end
-
-              {:error, reason} ->
-                {:error, reason}
-            end
+            receive_response_head(socket, state)
 
           {:error, reason} ->
             {:error, reason}
@@ -239,6 +224,29 @@ defmodule ServerSentEvent.Client do
 
   defp start_streaming(_request, state) do
     {:ok, {nil, state}}
+  end
+
+  defp receive_response_head(socket, state, head_buffer \\ "") do
+    case recv(socket, 0, 2_000) do
+      {:ok, packet} ->
+        head_buffer = head_buffer <> packet
+
+        case Raxx.HTTP1.parse_response(head_buffer) do
+          {:ok, {response, _connection_state, :chunked, chunk_buffer}} ->
+            :ok = set_active(socket)
+            state = %{state | socket: socket, chunk_buffer: chunk_buffer}
+            {:ok, {response, state}}
+
+          {:ok, {response, _connection_state, _body_read_state, _buffer}} ->
+            {:error, {:bad_response, response}}
+
+          {:more, :undefined} ->
+            receive_response_head(socket, state, head_buffer)
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   defp wrap_response({:noreply, internal_state}, state = %__MODULE__{}) do
