@@ -30,12 +30,6 @@ defmodule ServerSentEvent.ClientPropertyTest do
       assert String.contains?(first_request, "accept: text/event-stream")
       assert String.contains?(first_request, "\r\n\r\n")
 
-      :ok = :gen_tcp.send(socket, [@first_response])
-      assert_receive {:connect, response = %Raxx.Response{}}, 5_000
-      assert response.status == 200
-      assert response.body == true
-      assert Raxx.get_header(response, "content-type") == "text/event-stream"
-
       # preparing the response
       whole_response =
         sses
@@ -45,6 +39,9 @@ defmodule ServerSentEvent.ClientPropertyTest do
         |> Enum.map(&Raxx.HTTP1.serialize_chunk/1)
         |> Enum.join("")
 
+      whole_response = "#{@first_response}" <> whole_response
+
+      # Note this includes the status line and headers, it is NOT equal to the content length
       response_length = byte_size(whole_response)
 
       split_pairs =
@@ -66,6 +63,11 @@ defmodule ServerSentEvent.ClientPropertyTest do
         # try to make sure erlang's magic is not going to merge the packets
         Process.sleep(10)
       end)
+
+      assert_receive {:connect, response = %Raxx.Response{}}, 5_000
+      assert response.status == 200
+      assert response.body == true
+      assert Raxx.get_header(response, "content-type") == "text/event-stream"
 
       Enum.each(sses, fn sse ->
         received = assert_receive %ServerSentEvent{}, 5_000
