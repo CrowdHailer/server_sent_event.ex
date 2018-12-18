@@ -56,3 +56,11 @@ mix deps.get
 mix test
 mix dialyzer
 ```
+
+## Benchmarks
+
+Some microbenchmarks have been written to inform some implementation decisions
+
+To run them, run
+
+    mix run bench/*
