@@ -26,7 +26,8 @@ defmodule ServerSentEvent do
   | **comments** | Any lines from original block that were marked as comments |
   """
 
-  @new_line ~r/\R/
+  @new_line ["\r\n", "\r", "\n"]
+  @field_name_terminator [": ", ":"]
 
   @type t :: %__MODULE__{
           type: nil | String.t(),
@@ -337,7 +338,7 @@ defmodule ServerSentEvent do
   end
 
   defp process_line(line, event) do
-    case String.split(line, ~r/: ?/, parts: 2) do
+    case String.split(line, @field_name_terminator, parts: 2) do
       ["", value] ->
         process_field("comment", value, event)
 

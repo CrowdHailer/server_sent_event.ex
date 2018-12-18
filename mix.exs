@@ -29,7 +29,8 @@ defmodule ServerSentEvent.Mixfile do
       {:dialyxir, "~> 0.5", only: [:dev, :test], runtime: false},
       {:ex_doc, ">= 0.0.0", only: :dev},
       {:stream_data, "~> 0.4.2", only: :test},
-      {:mix_test_watch, "~> 0.9.0", only: [:dev, :test], runtime: false}
+      {:mix_test_watch, "~> 0.9.0", only: [:dev, :test], runtime: false},
+      {:benchee, "~> 0.13.2", only: [:dev, :test]}
     ]
   end
 

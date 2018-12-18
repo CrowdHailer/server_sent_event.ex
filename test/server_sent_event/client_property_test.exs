@@ -118,6 +118,28 @@ defmodule ServerSentEvent.ClientPropertyTest do
     end
   end
 
+  test "string splitting performance" do
+    input = "aaa\rbbbb\rcccc\r\n" |> String.duplicate(10000)
+
+    inputs = [input]
+
+    last_input = List.last(inputs)
+
+    IO.puts("length: #{String.length(last_input)}")
+    IO.inspect(last_input)
+
+    alias ServerSentEvent.Splitting
+
+    Benchee.run(%{
+      "with_regex" => fn -> Enum.each(inputs, &Splitting.with_regex/1) end,
+      "with_binary_split" => fn -> Enum.each(inputs, &Splitting.with_binary_split/1) end,
+      "with_elixir_string_split" => fn ->
+        Enum.each(inputs, &Splitting.with_elixir_string_split/1)
+      end
+      # "with_elixir_string_split_compiled" => fn -> Enum.each(inputs, &Splitting.with_binary_string_split_compiled/1) end,
+    })
+  end
+
   def any_sse() do
     StreamData.frequency([
       {9, simple_sse()},
