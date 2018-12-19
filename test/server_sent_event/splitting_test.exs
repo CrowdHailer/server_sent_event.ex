@@ -8,7 +8,6 @@ defmodule ServerSentEvent.SplittingTest do
     check all input <- StreamData.string([?a..?f, ?ż, ?\r, ?\n]),
               max_runs: 500,
               max_run_time: 100 do
-
       baseline = with_regex(input)
 
       assert with_binary_split(input) == baseline
