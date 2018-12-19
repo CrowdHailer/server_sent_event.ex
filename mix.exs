@@ -4,7 +4,7 @@ defmodule ServerSentEvent.Mixfile do
   def project do
     [
       app: :server_sent_event,
-      version: "0.4.6",
+      version: "0.4.7",
       elixir: "~> 1.7",
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,
