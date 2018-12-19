@@ -26,10 +26,11 @@ defmodule ServerSentEvent.Mixfile do
   defp deps do
     [
       {:raxx, "~> 0.16.0 or ~> 0.17.0"},
-      {:dialyxir, "~> 0.5", only: [:dev, :test], runtime: false},
+      {:dialyxir, ">= 0.5.0", only: [:dev, :test], runtime: false, optional: true},
       {:ex_doc, ">= 0.0.0", only: :dev},
       {:stream_data, "~> 0.4.2", only: :test},
-      {:mix_test_watch, "~> 0.9.0", only: [:dev, :test], runtime: false}
+      {:mix_test_watch, ">= 0.9.0", only: [:dev, :test], runtime: false, optional: true},
+      {:benchee, ">= 0.13.2", only: [:dev, :test], optional: true}
     ]
   end
 

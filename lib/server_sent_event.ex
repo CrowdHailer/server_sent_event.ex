@@ -26,7 +26,8 @@ defmodule ServerSentEvent do
   | **comments** | Any lines from original block that were marked as comments |
   """
 
-  @new_line ~r/\R/
+  @new_line ["\r\n", "\r", "\n"]
+  @field_name_terminator [": ", ":"]
 
   @type t :: %__MODULE__{
           type: nil | String.t(),
@@ -179,7 +180,7 @@ defmodule ServerSentEvent do
   end
 
   defp single_line?(text) do
-    length(String.split(text, @new_line, parts: 2)) == 1
+    length(:binary.split(text, @new_line)) == 1
   end
 
   @doc """
@@ -327,7 +328,7 @@ defmodule ServerSentEvent do
   end
 
   defp pop_line(stream) do
-    case String.split(stream, @new_line, parts: 2) do
+    case :binary.split(stream, @new_line) do
       [^stream] ->
         nil
 
@@ -337,7 +338,7 @@ defmodule ServerSentEvent do
   end
 
   defp process_line(line, event) do
-    case String.split(line, ~r/: ?/, parts: 2) do
+    case :binary.split(line, @field_name_terminator) do
       ["", value] ->
         process_field("comment", value, event)
 
