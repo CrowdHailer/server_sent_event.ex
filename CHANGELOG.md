@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## Master
+
+### Fixed
+
+- Slow event parsing on inputs containing many new line characters
+
 ## [0.4.6](https://github.com/CrowdHailer/server_sent_event.ex/tree/0.4.6) - 2018-11-09
 
 ### Fixed
