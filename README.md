@@ -1,7 +1,9 @@
 # ServerSentEvent
 
+[![Hex pm](http://img.shields.io/hexpm/v/server_sent_event.svg?style=flat)](https://hex.pm/packages/server_sent_event)
 [![Build Status](https://secure.travis-ci.org/CrowdHailer/server_sent_event.ex.svg?branch=master
 "Build Status")](https://travis-ci.org/CrowdHailer/server_sent_event.ex)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 **Push updates to web clients over HTTP, using dedicated server-push protocol.**
 
