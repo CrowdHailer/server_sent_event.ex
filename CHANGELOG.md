@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.0.0](https://github.com/CrowdHailer/server_sent_event.ex/tree/1.0.0) - 2019-05-01
+
+### Removed
+
+- Raxx versions `0.x.y` are no longer supported.
+
 ## [0.4.9](https://github.com/CrowdHailer/server_sent_event.ex/tree/0.4.9) - 2019-04-16
 
 ### Added
