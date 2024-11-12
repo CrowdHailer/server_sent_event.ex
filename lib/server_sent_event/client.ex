@@ -91,30 +91,40 @@ defmodule ServerSentEvent.Client do
   @callback handle_event(ServerSentEvent.t(), state) :: state
 
   use GenServer
-  @enforce_keys [:module, :internal_state, :socket, :chunk_buffer, :sse_buffer]
+
+  @enforce_keys [
+    :module,
+    :internal_state,
+    :socket,
+    :chunk_buffer,
+    :sse_buffer,
+    :tls_client_options
+  ]
   defstruct @enforce_keys
 
   @spec start(module, state, GenServer.options()) :: GenServer.on_start()
-  def start(module, internal_state, options \\ []) do
+  def start(module, internal_state, options \\ [], tls_client_options \\ []) do
     state = %__MODULE__{
       module: module,
       internal_state: internal_state,
       socket: nil,
       chunk_buffer: "",
-      sse_buffer: ""
+      sse_buffer: "",
+      tls_client_options: tls_client_options
     }
 
     GenServer.start(__MODULE__, state, options)
   end
 
   @spec start_link(module, state, GenServer.options()) :: GenServer.on_start()
-  def start_link(module, internal_state, options \\ []) do
+  def start_link(module, internal_state, options \\ [], tls_client_options \\ []) do
     state = %__MODULE__{
       module: module,
       internal_state: internal_state,
       socket: nil,
       chunk_buffer: "",
-      sse_buffer: ""
+      sse_buffer: "",
+      tls_client_options: tls_client_options
     }
 
     GenServer.start_link(__MODULE__, state, options)
@@ -198,7 +208,7 @@ defmodule ServerSentEvent.Client do
   end
 
   defp start_streaming(request, state = %{socket: nil}) do
-    case connect(request) do
+    case connect(request, state) do
       {:ok, socket} ->
         binary =
           case Raxx.HTTP1.serialize_request(request, connection: :close) do
@@ -271,11 +281,18 @@ defmodule ServerSentEvent.Client do
     end
   end
 
-  defp connect(request) do
+  defp connect(request, state) do
     scheme = request.scheme || :http
     host = :erlang.binary_to_list(Raxx.request_host(request))
     port = Raxx.request_port(request)
+
     options = [mode: :binary, active: false]
+
+    ssl_options =
+      Keyword.merge(
+        options,
+        state.tls_client_options
+      )
 
     case scheme do
       :http ->
@@ -288,7 +305,7 @@ defmodule ServerSentEvent.Client do
         end
 
       :https ->
-        case :ssl.connect(host, port, options, 2_000) do
+        case :ssl.connect(host, port, ssl_options, 2_000) do
           {:ok, socket} ->
             {:ok, {:ssl, socket}}
 
